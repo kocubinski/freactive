@@ -54,6 +54,8 @@
 
       (number? x) (str x)
 
+      (instance? cljs.core/LazySeq x) x
+
       :default (-get-virtual-dom x))
 
     ;; nil values treated as empty "placeholder" text nodes
@@ -259,7 +261,7 @@
 
 (defn- bind-style-prop! [element attr-name attr-value node-state]
   (let [setter (fn [v]
-                 ;(println "setting style" element attr-name v)
+                 ;;(println "setting style" element attr-name v)
                  (set-style-prop! element attr-name v))]
     (if (satisfies? cljs.core/IDeref attr-value)
       (bind-attr* setter element "style" attr-name attr-value node-state)
@@ -315,6 +317,10 @@
     (identical? "data-state" attr-name)
     (fn [state] (set-data-state! element state))
 
+    (and (identical? (. element -type) "option") (identical? attr-name "selected"))
+    (fn [attr-value]
+      (set! (. element -selected) (true? attr-value)))
+
     (and (identical? (. element -type) "checkbox") (identical? attr-name "checked"))
     (fn [attr-value]
       (set! (. element -checked) (true? attr-value)))
@@ -327,13 +333,13 @@
 
     :default
     (fn [attr-value]
-      (.setAttribute
-        element attr-name
+      (when attr-value
+        (.setAttribute
+         element attr-name
         (if attr-value
-          (if (.-substring attr-value)
-            attr-value
-            (.toString attr-value))
-          "")))))
+         (if (.-substring attr-value)
+           attr-value
+           (.toString attr-value))))))))
 
 (defn- bind-attr! [element attr-name attr-value node-state]
   (let [attr-name (name attr-name)]
@@ -456,6 +462,7 @@
     (assert xmlns (str "Don't know how to handle namespace " kw-ns))))
 
 (defn- create-dom-node [kw]
+  (println (str "create-dom-node " kw))
   (let [tag-ns (namespace kw)
         [_ tag id class] (re-matches re-tag (name kw))
         node (if tag-ns
@@ -619,6 +626,8 @@
   ([parent new-elem before]
    (let [show (get-transition new-elem :node-mounted)
          new-elem (append-or-insert-child parent new-elem before)]
+     (print "mount element ")
+     (.log js/console new-elem)
      (when show
        (show new-elem)
        new-elem)
@@ -757,7 +766,8 @@
 
 (defn build-element [elem-spec]
   (let [virtual-dom (get-virtual-dom elem-spec)]
-    ;(println virtual-dom)
+    ;;(println virtual-dom)
+    (println "build-element " elem-spec)
     (cond
       (string? virtual-dom)
       (.createTextNode js/document virtual-dom)
